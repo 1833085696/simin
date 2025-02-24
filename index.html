@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>词语位置查询（拼音增强版）</title>
+  <style>
+    body { padding: 20px; font-family: Arial; max-width: 500px; margin: 0 auto; }
+    .container { position: relative; }
+    input { width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ddd; border-radius: 4px; }
+    #suggestions { 
+      position: absolute; 
+      width: 100%; 
+      border: 1px solid #ddd; 
+      background: white; 
+      display: none;
+      z-index: 1000;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+    .suggestion-item:hover { background: #f5f5f5; }
+    .chinese { color: #333; }
+    .pinyin { color: #666; font-size: 0.9em; }
+    .position { float: right; color: #666; }
+    .no-result { color: #999; padding: 10px; }
+    
+    @media (max-width: 480px) {
+      input { font-size: 14px; }
+      .pinyin { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <h3>输入中文或拼音查询位置：</h3>
+  <div class="container">
+    <input type="text" id="input" placeholder="例如输入 '你' 或 'n' 或 'nh'">
+    <div id="suggestions"></div>
+  </div>
+
+  <script>
+    // 词语数据
+    const wordData = [
+      { chinese: "啊", pinyin: "a", position: "1排1列" },
+      { chinese: "爱", pinyin: "ai", position: "1排2列" },
+      { chinese: "你", pinyin: "ni", position: "2排1列" },
+      { chinese: "你好", pinyin: "nihao", position: "2排2列" },
+      { chinese: "好吗", pinyin: "haoma", position: "3排1列" },
+      { chinese: "白术", pinyin: "baizhu", position: "3排3列" },
+      { chinese: "那", pinyin: "na", position: "3排2列" }
+    ];
+
+    // DOM元素
+    const input = document.getElementById("input");
+    const suggestionsDiv = document.getElementById("suggestions");
+    let timeout;
+
+    // 输入处理（含防抖）
+    input.addEventListener("input", (e) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => handleInput(e.target.value), 300);
+    });
+
+    // 核心处理函数
+    function handleInput(rawInput) {
+      const inputText = rawInput.trim().toLowerCase();
+      suggestionsDiv.innerHTML = '';
+      suggestionsDiv.style.display = 'none';
+
+      if (!inputText) return;
+
+      // 构建正则表达式（处理特殊字符）
+      const escapedInput = inputText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pinyinPattern = escapedInput.split('').join('.*?');
+      const pinyinRegex = new RegExp(`^${pinyinPattern}.*`, 'i');
+
+      // 匹配逻辑
+      const matchedItems = wordData.filter(item => {
+        // 中文匹配
+        if (item.chinese.includes(inputText)) return true;
+        
+        // 拼音匹配（全拼包含或简拼匹配）
+        return item.pinyin.includes(inputText) || pinyinRegex.test(item.pinyin);
+      });
+
+      // 显示结果
+      if (matchedItems.length > 0) {
+        suggestionsDiv.style.display = 'block';
+        matchedItems.forEach(item => createSuggestionItem(item));
+      } else {
+        showNoResult();
+      }
+    }
+
+    // 创建建议项
+    function createSuggestionItem(item) {
+      const div = document.createElement('div');
+      div.className = 'suggestion-item';
+      div.innerHTML = `
+        <div>
+          <span class="chinese">${item.chinese}</span>
+          <span class="pinyin">(${item.pinyin})</span>
+          <span class="position">${item.position}</span>
+        </div>
+      `;
+      div.addEventListener('click', () => {
+        input.value = item.chinese;
+        suggestionsDiv.style.display = 'none';
+      });
+      suggestionsDiv.appendChild(div);
+    }
+
+    // 显示无结果
+    function showNoResult() {
+      suggestionsDiv.innerHTML = `<div class="suggestion-item no-result">无匹配结果</div>`;
+      suggestionsDiv.style.display = 'block';
+    }
+
+    // 点击外部关闭
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.container')) {
+        suggestionsDiv.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
