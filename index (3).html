@@ -1,0 +1,515 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>中药位置查询（拼音增强版）</title>
+  <style>
+    body { padding: 20px; font-family: Arial; max-width: 500px; margin: 0 auto; }
+    .container { position: relative; margin-bottom: 10px; }
+    input { width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ddd; border-radius: 4px; }
+    #suggestions { 
+      position: absolute; 
+      width: 100%; 
+      border: 1px solid #ddd; 
+      background: white; 
+      display: none;
+      z-index: 1000;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+    .suggestion-item:hover { background: #f5f5f5; }
+    .chinese { color: #333; }
+    .pinyin { color: #666; font-size: 0.9em; }
+    .position { float: right; color: #666; }
+    .no-result { color: #999; padding: 10px; }
+    
+    #selectedItems {
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      padding: 10px;
+      border-radius: 4px;
+      min-height: 50px;
+    }
+    
+    .selected-item {
+      padding: 5px 0;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .button-group {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    
+    .btn {
+      padding: 8px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    #clearBtn {
+      background-color: #f44336;
+      color: white;
+    }
+    
+    #clearBtn:hover {
+      background-color: #d32f2f;
+    }
+    
+    #sortBtn {
+      background-color: #4CAF50;
+      color: white;
+    }
+    
+    #sortBtn:hover {
+      background-color: #388E3C;
+    }
+    
+    @media (max-width: 480px) {
+      input { font-size: 14px; }
+      .pinyin { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <h3>输入中药名称或拼音查询位置：</h3>
+  <div class="container">
+    <input type="text" id="input" placeholder="例如输入 '绵茵陈' 或 'myc'">
+    <div id="suggestions"></div>
+  </div>
+  
+  <div id="selectedItems">
+    <div style="color: #999;">已选药品将显示在这里...</div>
+  </div>
+  
+  <div class="button-group">
+    <button id="sortBtn" class="btn">排序</button>
+    <button id="clearBtn" class="btn">清除记录</button>
+  </div>
+
+  <script>
+    // 词语数据 - 中药名称及其位置
+    const wordData = [
+      // 1号柜
+      { chinese: "绵茵陈", pinyin: "mianyinchen", position: "1号柜一层" },
+      { chinese: "紫草", pinyin: "zicao", position: "1号柜一层" },
+      { chinese: "金钱草", pinyin: "jinqiancao", position: "1号柜一层" },
+      { chinese: "马鞭草", pinyin: "mabiancao", position: "1号柜一层" },
+      { chinese: "木蝴蝶", pinyin: "muhudie", position: "1号柜一层" },
+      { chinese: "化橘红", pinyin: "huajuhong", position: "1号柜一层" },
+      { chinese: "金银花", pinyin: "jinyinhua", position: "1号柜二层" },
+      { chinese: "红花", pinyin: "honghua", position: "1号柜二层" },
+      { chinese: "菊花", pinyin: "juhua", position: "1号柜二层" },
+      { chinese: "蜜款冬花", pinyin: "mikuandonghua", position: "1号柜二层" },
+      { chinese: "蜜旋复花", pinyin: "mixuanfuhua", position: "1号柜二层" },
+      { chinese: "蝉蜕", pinyin: "chantui", position: "1号柜三层" },
+      { chinese: "炒鸡内金", pinyin: "chaojineijin", position: "1号柜三层" },
+      { chinese: "炒僵蚕", pinyin: "chaojiangcan", position: "1号柜三层" },
+      { chinese: "海螵蛸", pinyin: "haipiaoxiao", position: "1号柜三层" },
+      { chinese: "地龙", pinyin: "dilong", position: "1号柜三层" },
+      { chinese: "辛夷", pinyin: "xinyi", position: "1号柜三层" },
+      { chinese: "牡蛎", pinyin: "muli", position: "1号柜四层" },
+      { chinese: "芒硝", pinyin: "mangxiao", position: "1号柜四层" },
+      { chinese: "珍珠母", pinyin: "zhenzhumu", position: "1号柜四层" },
+      { chinese: "煅牡蛎", pinyin: "duanmuli", position: "1号柜四层" },
+      { chinese: "龙齿", pinyin: "longchi", position: "1号柜四层" },
+      { chinese: "锻瓦楞子", pinyin: "duanwalengzi", position: "1号柜四层" },
+      { chinese: "生石膏", pinyin: "shengshigao", position: "1号柜四层" },
+      { chinese: "生赭石", pinyin: "shengzheshi", position: "1号柜四层" },
+      { chinese: "蛤壳", pinyin: "geke", position: "1号柜四层" },
+
+      // 2号柜
+      { chinese: "蜜百部", pinyin: "mibaibu", position: "2号柜一层" },
+      { chinese: "蜜紫菀", pinyin: "miziwan", position: "2号柜一层" },
+      { chinese: "蜜白前", pinyin: "mibaiqian", position: "2号柜一层" },
+      { chinese: "大血藤", pinyin: "daxueteng", position: "2号柜一层" },
+      { chinese: "钩藤", pinyin: "gouteng", position: "2号柜一层" },
+      { chinese: "细辛", pinyin: "xixin", position: "2号柜一层" },
+      { chinese: "炒桑枝", pinyin: "chaosangzhi", position: "2号柜一层" },
+      { chinese: "醋北柴胡", pinyin: "cubeichaihu", position: "2号柜二层" },
+      { chinese: "当归", pinyin: "danggui", position: "2号柜二层" },
+      { chinese: "黄芪", pinyin: "huangqi", position: "2号柜二层" },
+      { chinese: "茯苓", pinyin: "fuling", position: "2号柜二层" },
+      { chinese: "木香", pinyin: "muxiang", position: "2号柜三层" },
+      { chinese: "酒黄精", pinyin: "jiuhuangjing", position: "2号柜三层" },
+      { chinese: "苦参", pinyin: "kushen", position: "2号柜三层" },
+      { chinese: "酒肉苁蓉", pinyin: "jiuroucongrong", position: "2号柜三层" },
+      { chinese: "射干", pinyin: "shegan", position: "2号柜三层" },
+      { chinese: "蜜百合", pinyin: "mibaihe", position: "2号柜三层" },
+      { chinese: "石斛", pinyin: "shihu", position: "2号柜三层" },
+      { chinese: "桑寄生", pinyin: "sangjisheng", position: "2号柜四层" },
+      { chinese: "白茅根", pinyin: "baimaogen", position: "2号柜四层" },
+      { chinese: "皂角刺", pinyin: "zaojiaoci", position: "2号柜四层" },
+      { chinese: "芦根", pinyin: "lugen", position: "2号柜四层" },
+      { chinese: "烫骨碎补", pinyin: "tanggusubu", position: "2号柜四层" },
+      { chinese: "茜草", pinyin: "qiancao", position: "2号柜四层" },
+      { chinese: "烫狗脊", pinyin: "tang gouji", position: "2号柜四层" },
+
+      // 3号柜
+      { chinese: "竹茹", pinyin: "zhuru", position: "3号柜一层" },
+      { chinese: "泽兰", pinyin: "zelan", position: "3号柜一层" },
+      { chinese: "蜜枇杷叶", pinyin: "mipipaye", position: "3号柜一层" },
+      { chinese: "淡竹叶", pinyin: "danzhuye", position: "3号柜一层" },
+      { chinese: "桑叶", pinyin: "sangye", position: "3号柜一层" },
+      { chinese: "陈皮", pinyin: "chenpi", position: "3号柜二层" },
+      { chinese: "厚朴", pinyin: "houpo", position: "3号柜二层" },
+      { chinese: "大腹毛", pinyin: "dafumao", position: "3号柜二层" },
+      { chinese: "牡丹皮", pinyin: "mudanpi", position: "3号柜二层" },
+      { chinese: "肉桂", pinyin: "rougui", position: "3号柜二层" },
+      { chinese: "合欢皮", pinyin: "hehuanpi", position: "3号柜三层" },
+      { chinese: "醋青皮", pinyin: "cuqingpi", position: "3号柜三层" },
+      { chinese: "桑白皮", pinyin: "sangbaipi", position: "3号柜三层" },
+      { chinese: "蜜桑白皮", pinyin: "misangbaipi", position: "3号柜三层" },
+      { chinese: "白鲜皮", pinyin: "baixianpi", position: "3号柜三层" },
+      { chinese: "盐黄柏", pinyin: "yanhuangbo", position: "3号柜三层" },
+      { chinese: "地骨皮", pinyin: "digupi", position: "3号柜四层" },
+      { chinese: "麻黄", pinyin: "mahuang", position: "3号柜四层" },
+      { chinese: "蜜麻黄", pinyin: "mimahuang", position: "3号柜四层" },
+      { chinese: "石韦", pinyin: "shiwei", position: "3号柜四层" },
+      { chinese: "盐杜仲", pinyin: "yanduzhong", position: "3号柜四层" },
+      { chinese: "紫苏叶", pinyin: "zisuye", position: "3号柜四层" },
+
+      // 4号柜
+      { chinese: "续断", pinyin: "xuduan", position: "4号柜一层" },
+      { chinese: "防风", pinyin: "fangfeng", position: "4号柜一层" },
+      { chinese: "醋莪术", pinyin: "cueshu", position: "4号柜一层" },
+      { chinese: "粉葛", pinyin: "fenge", position: "4号柜一层" },
+      { chinese: "土茯苓", pinyin: "tufuling", position: "4号柜一层" },
+      { chinese: "葛根", pinyin: "gegen", position: "4号柜一层" },
+      { chinese: "麸炒白术", pinyin: "fuchaobaizhu", position: "4号柜二层" },
+      { chinese: "党参", pinyin: "dangshen", position: "4号柜二层" },
+      { chinese: "丹参", pinyin: "danshen", position: "4号柜二层" },
+      { chinese: "地黄", pinyin: "dihuang", position: "4号柜二层" },
+      { chinese: "炙甘草", pinyin: "zhigancao", position: "4号柜三层" },
+      { chinese: "防己", pinyin: "fangji", position: "4号柜三层" },
+      { chinese: "玄参", pinyin: "xuanshen", position: "4号柜三层" },
+      { chinese: "麦冬", pinyin: "maidong", position: "4号柜三层" },
+      { chinese: "桂枝", pinyin: "guizhi", position: "4号柜三层" },
+      { chinese: "赤芍", pinyin: "chishao", position: "4号柜四层" },
+      { chinese: "白术", pinyin: "baizhu", position: "4号柜四层" },
+      { chinese: "醋郁金", pinyin: "cuyujin", position: "4号柜四层" },
+      { chinese: "炒白芍", pinyin: "chaobaishao", position: "4号柜四层" },
+      { chinese: "桔梗", pinyin: "jiegeng", position: "4号柜四层" },
+      { chinese: "熟地黄", pinyin: "shudihuang", position: "4号柜四层" },
+
+      // 5号柜
+      { chinese: "首乌藤", pinyin: "shouwuteng", position: "5号柜一层" },
+      { chinese: "鸡血藤", pinyin: "jixueteng", position: "5号柜一层" },
+      { chinese: "大黄", pinyin: "dahuang", position: "5号柜一层" },
+      { chinese: "酒大黄", pinyin: "jiudahuang", position: "5号柜一层" },
+      { chinese: "白头翁", pinyin: "baitouweng", position: "5号柜一层" },
+      { chinese: "降香", pinyin: "jiangxiang", position: "5号柜一层" },
+      { chinese: "仙茅", pinyin: "xianmao", position: "5号柜一层" },
+      { chinese: "甘草片", pinyin: "gancaopian", position: "5号柜二层" },
+      { chinese: "炙黄芪", pinyin: "zhihuangqi", position: "5号柜二层" },
+      { chinese: "金荞麦", pinyin: "jinqiaomai", position: "5号柜二层" },
+      { chinese: "徐长卿", pinyin: "xuchangqing", position: "5号柜二层" },
+      { chinese: "北柴胡", pinyin: "beichaihu", position: "5号柜二层" },
+      { chinese: "青风藤", pinyin: "qingfengteng", position: "5号柜二层" },
+      { chinese: "硬前胡", pinyin: "yingqianhu", position: "5号柜二层" },
+      { chinese: "白芍", pinyin: "baishao", position: "5号柜三层" },
+      { chinese: "炮姜", pinyin: "paojiang", position: "5号柜三层" },
+      { chinese: "黑顺片", pinyin: "heishunpian", position: "5号柜三层" },
+      { chinese: "干姜", pinyin: "ganjiang", position: "5号柜三层" },
+      { chinese: "白芷", pinyin: "baizhi", position: "5号柜三层" },
+      { chinese: "黄芩", pinyin: "huangqin", position: "5号柜三层" },
+      { chinese: "醋延胡索", pinyin: "cuyanhusuo", position: "5号柜四层" },
+      { chinese: "盐泽泻", pinyin: "yanzexie", position: "5号柜四层" },
+      { chinese: "麸炒苍术", pinyin: "fuchaocangzhu", position: "5号柜四层" },
+      { chinese: "酒黄芩", pinyin: "jiuhuangqin", position: "5号柜四层" },
+      { chinese: "茯神", pinyin: "fushen", position: "5号柜四层" },
+
+      // 6号柜
+      { chinese: "制吴茱萸", pinyin: "zhiwuzhuyu", position: "6号柜一层" },
+      { chinese: "地肤子", pinyin: "difuzi", position: "6号柜一层" },
+      { chinese: "蛇床子", pinyin: "shechuangzi", position: "6号柜一层" },
+      { chinese: "焦槟榔", pinyin: "jiaobinglang", position: "6号柜一层" },
+      { chinese: "炒苍耳子", pinyin: "chaoerzi", position: "6号柜一层" },
+      { chinese: "盐沙苑子", pinyin: "yanshayuanzi", position: "6号柜一层" },
+      { chinese: "乌梅", pinyin: "wumei", position: "6号柜一层" },
+      { chinese: "蔓荆子", pinyin: "manjingzi", position: "6号柜一层" },
+      { chinese: "桑椹", pinyin: "sangshen", position: "6号柜一层" },
+      { chinese: "炒葶苈子", pinyin: "chaotinglizi", position: "6号柜一层" },
+      { chinese: "麸炒薏苡仁", pinyin: "fuchaoyiyiren", position: "6号柜二层" },
+      { chinese: "薏苡仁", pinyin: "yiyiren", position: "6号柜二层" },
+      { chinese: "麸炒枳壳", pinyin: "fuchaozhiqiao", position: "6号柜二层" },
+      { chinese: "麸炒枳实", pinyin: "fuchaozhishi", position: "6号柜二层" },
+      { chinese: "紫苏子", pinyin: "zisuzi", position: "6号柜三层" },
+      { chinese: "炒酸枣仁", pinyin: "chaosuanzaoren", position: "6号柜三层" },
+      { chinese: "炒火麻仁", pinyin: "chaohuomaren", position: "6号柜三层" },
+      { chinese: "莱菔子", pinyin: "laifuzi", position: "6号柜三层" },
+      { chinese: "炒柏子仁", pinyin: "chaobaiziren", position: "6号柜三层" },
+      { chinese: "酒女贞子", pinyin: "jiunvzhenzi", position: "6号柜三层" },
+      { chinese: "炒牛蒡子", pinyin: "chaoniubangzi", position: "6号柜三层" },
+      { chinese: "净山楂", pinyin: "jingshanzha", position: "6号柜四层" },
+      { chinese: "焦山楂", pinyin: "jiaoshanzha", position: "6号柜四层" },
+      { chinese: "焦陕六神曲", pinyin: "jiaoshanliushenqu", position: "6号柜四层" },
+      { chinese: "焦麦芽", pinyin: "jiaomaiya", position: "6号柜四层" },
+      { chinese: "炒陕六神曲", pinyin: "chaoshanliushenqu", position: "6号柜四层" },
+      { chinese: "炒麦芽", pinyin: "chaomaiya", position: "6号柜四层" },
+      { chinese: "炒山楂", pinyin: "chaoshanzha", position: "6号柜四层" },
+      { chinese: "麦芽", pinyin: "maiya", position: "6号柜四层" },
+
+      // 7号柜
+      { chinese: "焦栀子", pinyin: "jiaozhizi", position: "7号柜一层" },
+      { chinese: "炒芥子", pinyin: "chaojizi", position: "7号柜一层" },
+      { chinese: "覆盆子", pinyin: "fupenzi", position: "7号柜一层" },
+      { chinese: "盐小茴香", pinyin: "yanxiaohuixiang", position: "7号柜一层" },
+      { chinese: "香橼", pinyin: "xiangyuan", position: "7号柜一层" },
+      { chinese: "炒茺蔚子", pinyin: "chaochongweizi", position: "7号柜一层" },
+      { chinese: "佛手", pinyin: "foshou", position: "7号柜一层" },
+      { chinese: "盐益智仁", pinyin: "yanyizhiren", position: "7号柜一层" },
+      { chinese: "路路通", pinyin: "lulutong", position: "7号柜一层" },
+      { chinese: "炒决明子", pinyin: "chaojuemingzi", position: "7号柜二层" },
+      { chinese: "煨诃子肉", pinyin: "weihezirou", position: "7号柜二层" },
+      { chinese: "炒川楝子", pinyin: "chaochuanlianzi", position: "7号柜二层" },
+      { chinese: "金樱子肉", pinyin: "jinyingzirou", position: "7号柜二层" },
+      { chinese: "木瓜", pinyin: "mugua", position: "7号柜二层" },
+      { chinese: "栀子", pinyin: "zhizi", position: "7号柜二层" },
+      { chinese: "浮小麦", pinyin: "fuxiaomai", position: "7号柜二层" },
+      { chinese: "盐补骨脂", pinyin: "yanbuguzhi", position: "7号柜二层" },
+      { chinese: "丝瓜络", pinyin: "sigualuo", position: "7号柜二层" },
+      { chinese: "莲子", pinyin: "lianzi", position: "7号柜三层" },
+      { chinese: "炒桃仁", pinyin: "chaotaoren", position: "7号柜三层" },
+      { chinese: "炒白扁豆", pinyin: "chaobaiyiandou", position: "7号柜三层" },
+      { chinese: "炒苦杏仁", pinyin: "chaokuxingren", position: "7号柜三层" },
+      { chinese: "炒蒺藜", pinyin: "chaojili", position: "7号柜三层" },
+      { chinese: "炒王不留行", pinyin: "chaowangbuliuxing", position: "7号柜三层" },
+      { chinese: "麸炒芡实", pinyin: "fuqianshi", position: "7号柜三层" },
+      { chinese: "盐车前子", pinyin: "yancheqianzi", position: "7号柜四层" },
+      { chinese: "楮实子", pinyin: "chushizi", position: "7号柜四层" },
+      { chinese: "盐菟丝子", pinyin: "yantusizi", position: "7号柜四层" },
+      { chinese: "醋五味子", pinyin: "cuwuweizi", position: "7号柜四层" },
+      { chinese: "连翘", pinyin: "lianqiao", position: "7号柜四层" },
+      { chinese: "瓜萎子", pinyin: "gualouzi", position: "7号柜四层" },
+      { chinese: "瓜萎", pinyin: "gualou", position: "7号柜四层" },
+
+      // 8号柜
+      { chinese: "益母草", pinyin: "yimucao", position: "8号柜一层" },
+      { chinese: "紫花地丁", pinyin: "zihuadiding", position: "8号柜一层" },
+      { chinese: "荆芥", pinyin: "jingjie", position: "8号柜一层" },
+      { chinese: "马齿苋", pinyin: "machixian", position: "8号柜一层" },
+      { chinese: "蒲公英", pinyin: "pugongying", position: "8号柜二层" },
+      { chinese: "夏枯草", pinyin: "xiakucao", position: "8号柜二层" },
+      { chinese: "佩兰", pinyin: "peilan", position: "8号柜二层" },
+      { chinese: "墨旱莲", pinyin: "mohanlian", position: "8号柜二层" },
+      { chinese: "仙鹤草", pinyin: "xianhecao", position: "8号柜三层" },
+      { chinese: "半枝莲", pinyin: "banzhilian", position: "8号柜三层" },
+      { chinese: "薄荷", pinyin: "bohe", position: "8号柜三层" },
+      { chinese: "鱼腥草", pinyin: "yuxingcao", position: "8号柜三层" },
+      { chinese: "白花蛇舌草", pinyin: "baihuasheshecao", position: "8号柜四层" },
+      { chinese: "北败酱", pinyin: "beibaijiang", position: "8号柜四层" },
+      { chinese: "炙淫羊藿", pinyin: "zhiyinyanghuo", position: "8号柜四层" },
+      { chinese: "车前草", pinyin: "cheqiancao", position: "8号柜四层" },
+
+      // 9号柜
+      { chinese: "太子参", pinyin: "taizishen", position: "9号柜一层" },
+      { chinese: "猫爪草", pinyin: "maozhuacao", position: "9号柜一层" },
+      { chinese: "石菖蒲", pinyin: "shichangpu", position: "9号柜一层" },
+      { chinese: "盐巴戟天", pinyin: "yanbajitian", position: "9号柜一层" },
+      { chinese: "绵萆薛", pinyin: "mianbixie", position: "9号柜一层" },
+      { chinese: "玉竹", pinyin: "yuzhu", position: "9号柜一层" },
+      { chinese: "制何首乌", pinyin: "zhiheshouwu", position: "9号柜一层" },
+      { chinese: "酒川牛膝", pinyin: "jiuchuanniuxi", position: "9号柜二层" },
+      { chinese: "制远志", pinyin: "zhiyuanzhi", position: "9号柜二层" },
+      { chinese: "川芎", pinyin: "chuanxiong", position: "9号柜二层" },
+      { chinese: "山药", pinyin: "shanyao", position: "9号柜二层" },
+      { chinese: "麸炒山药", pinyin: "fuchaoshanyao", position: "9号柜二层" },
+      { chinese: "法半夏", pinyin: "fabanxia", position: "9号柜三层" },
+      { chinese: "姜半夏", pinyin: "jiangbanxia", position: "9号柜三层" },
+      { chinese: "清半夏", pinyin: "qingbanxia", position: "9号柜三层" },
+      { chinese: "乌药", pinyin: "wuyao", position: "9号柜三层" },
+      { chinese: "羌活", pinyin: "qianghuo", position: "9号柜三层" },
+      { chinese: "独活", pinyin: "duhuo", position: "9号柜三层" },
+      { chinese: "北沙参", pinyin: "beishashen", position: "9号柜三层" },
+      { chinese: "牛膝", pinyin: "niuxi", position: "9号柜三层" },
+      { chinese: "天花粉", pinyin: "tianhuafen", position: "9号柜四层" },
+      { chinese: "薤白", pinyin: "xiebai", position: "9号柜四层" },
+      { chinese: "盐知母", pinyin: "yanzhimu", position: "9号柜四层" },
+      { chinese: "醋香附", pinyin: "cuxiangfu", position: "9号柜四层" },
+      { chinese: "升麻", pinyin: "shengma", position: "9号柜四层" },
+      { chinese: "威灵仙", pinyin: "weilingxian", position: "9号柜四层" },
+      { chinese: "板蓝根", pinyin: "banlangen", position: "9号柜四层" },
+      { chinese: "南沙参", pinyin: "nanshashen", position: "9号柜四层" },
+
+      // 10号柜(靠墙新货架)
+      { chinese: "大枣", pinyin: "dazao", position: "10号柜一层(靠墙新货架)" },
+      { chinese: "五味子", pinyin: "wuweizi", position: "10号柜一层(靠墙新货架)" },
+      { chinese: "百合", pinyin: "baihe", position: "10号柜一层(靠墙新货架)" },
+      { chinese: "淡豆豉", pinyin: "dandouchi", position: "10号柜一层(靠墙新货架)" },
+      { chinese: "猪苓", pinyin: "zhuling", position: "10号柜二层(靠墙新货架)" },
+      { chinese: "杜仲", pinyin: "duzhong", position: "10号柜二层(靠墙新货架)" },
+      { chinese: "醋鳖甲", pinyin: "cubiejia", position: "10号柜二层(靠墙新货架)" },
+      { chinese: "川牛膝", pinyin: "chuanniuxi", position: "10号柜二层(靠墙新货架)" },
+      { chinese: "泽泻", pinyin: "zexie", position: "10号柜三层(靠墙新货架)" },
+      { chinese: "炮附片", pinyin: "paofupian", position: "10号柜三层(靠墙新货架)" },
+      { chinese: "龙胆", pinyin: "longdan", position: "10号柜三层(靠墙新货架)" },
+      { chinese: "姜炭", pinyin: "jiangtan", position: "10号柜三层(靠墙新货架)" },
+
+      // 11号柜(铁皮柜)
+      { chinese: "酒萸肉", pinyin: "jiuyurou", position: "11号柜外侧(铁皮柜)" },
+      { chinese: "黄连", pinyin: "huanglian", position: "11号柜外侧(铁皮柜)" },
+      { chinese: "枸杞", pinyin: "gouqi", position: "11号柜外侧(铁皮柜)" },
+      { chinese: "天麻", pinyin: "tianma", position: "11号柜内侧(铁皮柜)" },
+      { chinese: "白及", pinyin: "baiji", position: "11号柜内侧(铁皮柜)" },
+      { chinese: "醋龟甲", pinyin: "cuguijia", position: "11号柜内侧(铁皮柜)" },
+      { chinese: "重楼", pinyin: "chonglou", position: "11号柜内侧(铁皮柜)" },
+      { chinese: "浙贝母", pinyin: "zhebeimu", position: "11号柜内侧(铁皮柜)" }
+    ];
+
+    const input = document.getElementById("input");
+    const suggestionsDiv = document.getElementById("suggestions");
+    const selectedItemsDiv = document.getElementById("selectedItems");
+    const clearBtn = document.getElementById("clearBtn");
+    const sortBtn = document.getElementById("sortBtn");
+    let timeout;
+    let selectedItems = [];
+
+    // 输入处理
+    input.addEventListener("input", (e) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => handleInput(e.target.value), 300);
+    });
+
+    // 提取柜号和层数
+    function getCabinetAndLayer(position) {
+      const match = position.match(/(\d+)号柜(.*)/);
+      if (!match) return [0, 0];
+      
+      const cabinet = parseInt(match[1]);
+      let layer = 0;
+      
+      if (match[2].includes("一层")) layer = 1;
+      else if (match[2].includes("二层")) layer = 2;
+      else if (match[2].includes("三层")) layer = 3;
+      else if (match[2].includes("四层")) layer = 4;
+      else if (match[2].includes("外侧")) layer = 1;
+      else if (match[2].includes("内侧")) layer = 2;
+      
+      return [cabinet, layer];
+    }
+
+    // 排序函数
+    function sortSelectedItems() {
+      const items = [...selectedItems];
+      items.sort((a, b) => {
+        const [aCabinet, aLayer] = getCabinetAndLayer(a.position);
+        const [bCabinet, bLayer] = getCabinetAndLayer(b.position);
+        
+        if (aCabinet !== bCabinet) return aCabinet - bCabinet;
+        return aLayer - bLayer;
+      });
+      
+      // 更新显示
+      selectedItemsDiv.innerHTML = '';
+      if (items.length === 0) {
+        selectedItemsDiv.innerHTML = '<div style="color: #999;">已选药品将显示在这里...</div>';
+      } else {
+        items.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'selected-item';
+          div.innerHTML = `<span>${item.chinese} - ${item.position}</span>`;
+          selectedItemsDiv.appendChild(div);
+        });
+      }
+      
+      // 更新存储
+      selectedItems = items;
+    }
+
+    // 处理输入
+    function handleInput(rawInput) {
+      const inputText = rawInput.trim().toLowerCase();
+      suggestionsDiv.innerHTML = '';
+      suggestionsDiv.style.display = 'none';
+
+      if (!inputText) return;
+
+      const escapedInput = inputText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pinyinPattern = escapedInput.split('').join('.*?');
+      const pinyinRegex = new RegExp(`^${pinyinPattern}.*`, 'i');
+
+      const matchedItems = wordData.filter(item => {
+        if (item.chinese.includes(inputText)) return true;
+        return item.pinyin.includes(inputText) || pinyinRegex.test(item.pinyin);
+      });
+
+      if (matchedItems.length > 0) {
+        showSuggestions(matchedItems);
+      } else {
+        showNoResult();
+      }
+    }
+
+    // 显示建议
+    function showSuggestions(items) {
+      suggestionsDiv.innerHTML = '';
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        div.innerHTML = `
+          <div>
+            <span class="chinese">${item.chinese}</span>
+            <span class="pinyin">(${item.pinyin})</span>
+            <span class="position">${item.position}</span>
+          </div>
+        `;
+        div.addEventListener('click', () => {
+          input.value = '';
+          suggestionsDiv.style.display = 'none';
+          addSelectedItem(item);
+          input.focus();
+        });
+        suggestionsDiv.appendChild(div);
+      });
+      suggestionsDiv.style.display = 'block';
+    }
+
+    // 添加已选药品
+    function addSelectedItem(item) {
+      const placeholder = selectedItemsDiv.querySelector('div[style="color: #999;"]');
+      if (placeholder) selectedItemsDiv.removeChild(placeholder);
+      
+      // 检查是否已存在
+      const exists = selectedItems.some(selected => selected.chinese === item.chinese);
+      if (exists) return;
+      
+      selectedItems.push(item);
+      
+      const div = document.createElement('div');
+      div.className = 'selected-item';
+      div.innerHTML = `<span>${item.chinese} - ${item.position}</span>`;
+      selectedItemsDiv.appendChild(div);
+    }
+
+    // 清除所有记录
+    function clearAllRecords() {
+      selectedItems = [];
+      selectedItemsDiv.innerHTML = '<div style="color: #999;">已选药品将显示在这里...</div>';
+    }
+
+    // 显示无结果
+    function showNoResult() {
+      suggestionsDiv.innerHTML = `<div class="suggestion-item no-result">无匹配结果</div>`;
+      suggestionsDiv.style.display = 'block';
+    }
+
+    // 事件监听
+    sortBtn.addEventListener('click', sortSelectedItems);
+    clearBtn.addEventListener('click', clearAllRecords);
+    
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.container')) {
+        suggestionsDiv.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
+
