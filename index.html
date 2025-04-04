@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>词语位置查询（拼音增强版）</title>
+  <title>中药位置查询（拼音增强版）</title>
   <style>
     body { padding: 20px; font-family: Arial; max-width: 500px; margin: 0 auto; }
-    .container { position: relative; }
+    .container { position: relative; margin-bottom: 10px; }
     input { width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ddd; border-radius: 4px; }
     #suggestions { 
       position: absolute; 
@@ -16,6 +16,8 @@
       display: none;
       z-index: 1000;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      max-height: 300px;
+      overflow-y: auto;
     }
     .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
     .suggestion-item:hover { background: #f5f5f5; }
@@ -24,6 +26,33 @@
     .position { float: right; color: #666; }
     .no-result { color: #999; padding: 10px; }
     
+    #selectedItems {
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      padding: 10px;
+      border-radius: 4px;
+      min-height: 50px;
+    }
+    
+    .selected-item {
+      padding: 5px 0;
+      border-bottom: 1px solid #eee;
+    }
+    
+    #clearBtn {
+      margin-top: 10px;
+      padding: 8px 15px;
+      background-color: #f44336;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    #clearBtn:hover {
+      background-color: #d32f2f;
+    }
+    
     @media (max-width: 480px) {
       input { font-size: 14px; }
       .pinyin { display: none; }
@@ -31,14 +60,18 @@
   </style>
 </head>
 <body>
-  <h3>输入中文或拼音查询位置：</h3>
+  <h3>输入中药名称或拼音查询位置：</h3>
   <div class="container">
-    <input type="text" id="input" placeholder="例如输入 '绵茵陈' 或 'myc'">
+    <input type="text" id="input", placeholder="例如输入 '绵茵陈' 或 'myc'">
     <div id="suggestions"></div>
   </div>
+  
+  <div id="selectedItems">
+    <div style="color: #999;">已选药品将显示在这里...</div>
+  </div>
+  
+  <button id="clearBtn">清除全部记录</button>
 
-  <script>
-    // 词语数据 - 中药名称及其位置
     const wordData = [
       // 1号柜
       { chinese: "绵茵陈", pinyin: "mianyinchen", position: "1号柜一层" },
@@ -58,11 +91,12 @@
       { chinese: "海螵蛸", pinyin: "haipiaoxiao", position: "1号柜三层" },
       { chinese: "地龙", pinyin: "dilong", position: "1号柜三层" },
       { chinese: "辛夷", pinyin: "xinyi", position: "1号柜三层" },
-      { chinese: "牡蝎", pinyin: "muxie", position: "1号柜四层" },
-      { chinese: "龙骨", pinyin: "longgu", position: "1号柜四层" },
+      { chinese: "牡蛎", pinyin: "muli", position: "1号柜四层" },
+      { chinese: "芒硝", pinyin: "mangxiao", position: "1号柜四层" },
+      { chinese: "珍珠母", pinyin: "zhenzhumu", position: "1号柜四层" },
       { chinese: "煅牡蛎", pinyin: "duanmuli", position: "1号柜四层" },
-      { chinese: "煅龙骨", pinyin: "duanlonggu", position: "1号柜四层" },
-      { chinese: "煅瓦楞子", pinyin: "duanwalengzi", position: "1号柜四层" },
+      { chinese: "龙齿", pinyin: "longchi", position: "1号柜四层" },
+      { chinese: "锻瓦楞子", pinyin: "duanwalengzi", position: "1号柜四层" },
       { chinese: "生石膏", pinyin: "shengshigao", position: "1号柜四层" },
       { chinese: "生赭石", pinyin: "shengzheshi", position: "1号柜四层" },
       { chinese: "蛤壳", pinyin: "geke", position: "1号柜四层" },
@@ -259,7 +293,7 @@
       { chinese: "绵萆薛", pinyin: "mianbixie", position: "9号柜一层" },
       { chinese: "玉竹", pinyin: "yuzhu", position: "9号柜一层" },
       { chinese: "制何首乌", pinyin: "zhiheshouwu", position: "9号柜一层" },
-      { chinese: "酒川牛膝", pinyin: "jiuchuan niuxi", position: "9号柜二层" },
+      { chinese: "酒川牛膝", pinyin: "jiuchuanniuxi", position: "9号柜二层" },
       { chinese: "制远志", pinyin: "zhiyuanzhi", position: "9号柜二层" },
       { chinese: "川芎", pinyin: "chuanxiong", position: "9号柜二层" },
       { chinese: "山药", pinyin: "shanyao", position: "9号柜二层" },
@@ -279,12 +313,38 @@
       { chinese: "升麻", pinyin: "shengma", position: "9号柜四层" },
       { chinese: "威灵仙", pinyin: "weilingxian", position: "9号柜四层" },
       { chinese: "板蓝根", pinyin: "banlangen", position: "9号柜四层" },
-      { chinese: "南沙参", pinyin: "nanshashen", position: "9号柜四层" }
+      { chinese: "南沙参", pinyin: "nanshashen", position: "9号柜四层" },
+
+      // 10号柜(靠墙新货架)
+      { chinese: "大枣", pinyin: "dazao", position: "10号柜一层(靠墙新货架)" },
+      { chinese: "五味子", pinyin: "wuweizi", position: "10号柜一层(靠墙新货架)" },
+      { chinese: "百合", pinyin: "baihe", position: "10号柜一层(靠墙新货架)" },
+      { chinese: "淡豆豉", pinyin: "dandouchi", position: "10号柜一层(靠墙新货架)" },
+      { chinese: "猪苓", pinyin: "zhuling", position: "10号柜二层(靠墙新货架)" },
+      { chinese: "杜仲", pinyin: "duzhong", position: "10号柜二层(靠墙新货架)" },
+      { chinese: "醋鳖甲", pinyin: "cubiejia", position: "10号柜二层(靠墙新货架)" },
+      { chinese: "川牛膝", pinyin: "chuanniuxi", position: "10号柜二层(靠墙新货架)" },
+      { chinese: "泽泻", pinyin: "zexie", position: "10号柜三层(靠墙新货架)" },
+      { chinese: "炮附片", pinyin: "paofupian", position: "10号柜三层(靠墙新货架)" },
+      { chinese: "龙胆", pinyin: "longdan", position: "10号柜三层(靠墙新货架)" },
+      { chinese: "姜炭", pinyin: "jiangtan", position: "10号柜三层(靠墙新货架)" },
+
+      // 11号柜(铁皮柜)
+      { chinese: "酒萸肉", pinyin: "jiuyurou", position: "11号柜外侧(铁皮柜)" },
+      { chinese: "黄连", pinyin: "huanglian", position: "11号柜外侧(铁皮柜)" },
+      { chinese: "枸杞", pinyin: "gouqi", position: "11号柜外侧(铁皮柜)" },
+      { chinese: "天麻", pinyin: "tianma", position: "11号柜内侧(铁皮柜)" },
+      { chinese: "白及", pinyin: "baiji", position: "11号柜内侧(铁皮柜)" },
+      { chinese: "醋龟甲", pinyin: "cuguijia", position: "11号柜内侧(铁皮柜)" },
+      { chinese: "重楼", pinyin: "chonglou", position: "11号柜内侧(铁皮柜)" },
+      { chinese: "浙贝母", pinyin: "zhebeimu", position: "11号柜内侧(铁皮柜)" }
     ];
 
     // DOM元素
     const input = document.getElementById("input");
     const suggestionsDiv = document.getElementById("suggestions");
+    const selectedItemsDiv = document.getElementById("selectedItems");
+    const clearBtn = document.getElementById("clearBtn");
     let timeout;
 
     // 输入处理（含防抖）
@@ -292,6 +352,25 @@
       clearTimeout(timeout);
       timeout = setTimeout(() => handleInput(e.target.value), 300);
     });
+
+    // 提取柜号和层数的辅助函数
+    function getCabinetAndLayer(position) {
+      const match = position.match(/(\d+)号柜(.*)/);
+      if (!match) return [0, 0];
+      
+      const cabinet = parseInt(match[1]);
+      let layer = 0;
+      
+      // 将层数转换为数字便于排序
+      if (match[2].includes("一层")) layer = 1;
+      else if (match[2].includes("二层")) layer = 2;
+      else if (match[2].includes("三层")) layer = 3;
+      else if (match[2].includes("四层")) layer = 4;
+      else if (match[2].includes("外侧")) layer = 5; // 外侧排在内侧前面
+      else if (match[2].includes("内侧")) layer = 6;
+      
+      return [cabinet, layer];
+    }
 
     // 核心处理函数
     function handleInput(rawInput) {
@@ -315,6 +394,20 @@
         return item.pinyin.includes(inputText) || pinyinRegex.test(item.pinyin);
       });
 
+      // 按照柜号和层数排序
+      matchedItems.sort((a, b) => {
+        const [aCabinet, aLayer] = getCabinetAndLayer(a.position);
+        const [bCabinet, bLayer] = getCabinetAndLayer(b.position);
+        
+        // 先按柜号排序
+        if (aCabinet !== bCabinet) {
+          return aCabinet - bCabinet;
+        }
+        
+        // 柜号相同则按层数排序
+        return aLayer - bLayer;
+      });
+
       // 显示结果
       if (matchedItems.length > 0) {
         suggestionsDiv.style.display = 'block';
@@ -336,10 +429,41 @@
         </div>
       `;
       div.addEventListener('click', () => {
-        input.value = item.chinese;
+        input.value = '';
         suggestionsDiv.style.display = 'none';
+        addSelectedItem(item);
+        input.focus(); // 保持输入框焦点
       });
       suggestionsDiv.appendChild(div);
+    }
+
+    // 添加已选药品
+    function addSelectedItem(item) {
+      // 检查是否已有初始提示，有则移除
+      const placeholder = selectedItemsDiv.querySelector('div[style="color: #999;"]');
+      if (placeholder) {
+        selectedItemsDiv.removeChild(placeholder);
+      }
+      
+      // 检查是否已添加过该药品
+      const existingItems = selectedItemsDiv.querySelectorAll('.selected-item');
+      for (let existingItem of existingItems) {
+        if (existingItem.textContent.includes(item.chinese)) {
+          return; // 如果已存在，则不重复添加
+        }
+      }
+      
+      const div = document.createElement('div');
+      div.className = 'selected-item';
+      div.innerHTML = `
+        <span>${item.chinese} - ${item.position}</span>
+      `;
+      selectedItemsDiv.appendChild(div);
+    }
+
+    // 清除所有记录
+    function clearAllRecords() {
+      selectedItemsDiv.innerHTML = '<div style="color: #999;">已选药品将显示在这里...</div>';
     }
 
     // 显示无结果
@@ -354,6 +478,9 @@
         suggestionsDiv.style.display = 'none';
       }
     });
+
+    // 清除按钮点击事件
+    clearBtn.addEventListener('click', clearAllRecords);
   </script>
 </body>
 </html>
